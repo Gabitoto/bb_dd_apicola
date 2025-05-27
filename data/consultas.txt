@@ -1,0 +1,278 @@
+-- =====================================================
+-- 5 CONSULTAS ÚTILES PARA LA BASE DE DATOS
+-- =====================================================
+
+-- CONSULTA 1: Resumen general de la base de datos
+SELECT 'APICULTORES' as entidad, COUNT(*) as total FROM apicultor
+UNION ALL
+SELECT 'ANALISTAS', COUNT(*) FROM analista
+UNION ALL
+SELECT 'APIARIOS', COUNT(*) FROM apiarios
+UNION ALL
+SELECT 'ESPECIES', COUNT(*) FROM especies
+UNION ALL
+SELECT 'TAMBORES', COUNT(*) FROM tambor
+UNION ALL
+SELECT 'MUESTRAS', COUNT(*) FROM muestra
+UNION ALL
+SELECT 'ANÁLISIS PALINOLÓGICOS', COUNT(*) FROM analisis_palinologico;
+
+-- CONSULTA 2: Producción por apicultor (apiarios y colmenas)
+SELECT 
+    ap.nombre || ' ' || ap.apellido as "Apicultor",
+    COUNT(a.id_apiario) as "Total Apiarios",
+    SUM(a.cant_colmenas) as "Total Colmenas",
+    ROUND(AVG(a.cant_colmenas::numeric), 1) as "Promedio Colmenas/Apiario",
+    STRING_AGG(DISTINCT SPLIT_PART(a.localidad, ' - ', 1), ', ') as "Provincias"
+FROM apicultor ap
+JOIN apiarios a ON ap.id_apicultor = a.id_apicultor
+GROUP BY ap.id_apicultor, ap.nombre, ap.apellido
+ORDER BY SUM(a.cant_colmenas) DESC;
+
+-- CONSULTA 3: Análisis palinológico detallado por muestra
+SELECT 
+    m.num_registro as "Muestra",
+    m.fecha_extraccion as "Fecha Extracción",
+    an.nombres || ' ' || an.apellidos as "Analista",
+    e.nombre_comun as "Especie",
+    e.familia as "Familia Botánica",
+    ap.cantidad_granos as "Granos",
+    ap.porcentaje as "Porcentaje (%)",
+    CASE 
+        WHEN ap.marca_especial IS NULL THEN 'Normal'
+        WHEN ap.marca_especial = '#' THEN 'Ocasional'
+        WHEN ap.marca_especial = '##' THEN 'Raro'
+    END as "Frecuencia",
+    m.observaciones as "Observaciones"
+FROM muestra m
+JOIN analista an ON m.id_analista = an.id_analista
+JOIN analisis_palinologico ap ON m.id_muestra = ap.id_muestra
+JOIN especies e ON ap.id_especie = e.id_especie
+WHERE m.fecha_analisis IS NOT NULL
+ORDER BY m.num_registro, ap.porcentaje DESC;
+
+-- CONSULTA 4: Especies más frecuentes en las mieles argentinas
+SELECT 
+    e.nombre_comun as "Especie",
+    e.nombre_cientifico as "Nombre Científico",
+    e.familia as "Familia",
+    COUNT(ap.id_palinologico) as "Apariciones",
+    ROUND(AVG(ap.porcentaje), 2) as "Porcentaje Promedio",
+    ROUND(SUM(ap.cantidad_granos)::numeric / COUNT(ap.id_palinologico), 0) as "Granos Promedio",
+    COUNT(CASE WHEN ap.porcentaje >= 45 THEN 1 END) as "Veces Dominante (≥45%)"
+FROM especies e
+JOIN analisis_palinologico ap ON e.id_especie = ap.id_especie
+GROUP BY e.id_especie, e.nombre_comun, e.nombre_cientifico, e.familia
+ORDER BY COUNT(ap.id_palinologico) DESC, AVG(ap.porcentaje) DESC;
+
+-- CONSULTA 5: Trazabilidad completa: desde apiario hasta análisis
+SELECT 
+    ap.nombre || ' ' || ap.apellido as "Apicultor",
+    a.nombre_apiario as "Apiario",
+    a.localidad as "Ubicación",
+    t.num_registro as "Tambor",
+    m.num_registro as "Muestra",
+    m.fecha_extraccion as "Extracción",
+    m.fecha_analisis as "Análisis",
+    an.nombres || ' ' || an.apellidos as "Analista",
+    COUNT(pal.id_palinologico) as "Especies Identificadas",
+    CASE 
+        WHEN m.fecha_analisis IS NULL THEN 'PENDIENTE'
+        ELSE 'COMPLETADO'
+    END as "Estado"
+FROM apicultor ap
+JOIN apiarios a ON ap.id_apicultor = a.id_apicultor
+JOIN tambor_api ta ON a.id_apiario = ta.id_apiario
+JOIN tambor t ON ta.id_tambor = t.id_tambor
+JOIN muestra_tambor mt ON t.id_tambor = mt.id_tambor
+JOIN muestra m ON mt.id_muestra = m.id_muestra
+JOIN analista an ON m.id_analista = an.id_analista
+LEFT JOIN analisis_palinologico pal ON m.id_muestra = pal.id_muestra
+GROUP BY ap.nombre, ap.apellido, a.nombre_apiario, a.localidad, 
+         t.num_registro, m.num_registro, m.fecha_extraccion, 
+         m.fecha_analisis, an.nombres, an.apellidos
+ORDER BY ap.apellido, a.nombre_apiario, m.fecha_extraccion;
+
+-- 6. LISTAR TODOS LOS APIARIOS CON SUS APICULTORES Y TOTAL DE COLMENAS
+SELECT 
+    ap.nombre || ' ' || ap.apellido AS apicultor,
+    a.nombre_apiario,
+    a.localidad,
+    a.cant_colmenas,
+    a.latitud,
+    a.longitud
+FROM apiarios a
+JOIN apicultor ap ON a.id_apicultor = ap.id_apicultor
+ORDER BY ap.apellido, a.nombre_apiario;
+
+-- 7. ESPECIES MÁS FRECUENTES EN LOS ANÁLISIS PALINOLÓGICOS
+SELECT 
+    e.nombre_comun,
+    e.nombre_cientifico,
+    e.familia,
+    COUNT(anp.id_palinologico) as frecuencia_aparicion,
+    ROUND(AVG(anp.porcentaje), 2) as porcentaje_promedio,
+    MAX(anp.porcentaje) as porcentaje_maximo
+FROM especies e
+JOIN analisis_palinologico anp ON e.id_especie = anp.id_especie
+GROUP BY e.id_especie, e.nombre_comun, e.nombre_cientifico, e.familia
+ORDER BY frecuencia_aparicion DESC, porcentaje_promedio DESC;
+
+-- 8. MUESTRAS CON ANÁLISIS COMPLETO Y SUS TAMBORES ASOCIADOS
+SELECT 
+    m.num_registro as muestra,
+    m.fecha_extraccion,
+    m.fecha_analisis,
+    an.nombres || ' ' || an.apellidos as analista,
+    STRING_AGG(t.num_registro, ', ') as tambores,
+    m.observaciones
+FROM muestra m
+JOIN analista an ON m.id_analista = an.id_analista
+JOIN muestra_tambor mt ON m.id_muestra = mt.id_muestra
+JOIN tambor t ON mt.id_tambor = t.id_tambor
+WHERE m.fecha_analisis IS NOT NULL
+GROUP BY m.id_muestra, m.num_registro, m.fecha_extraccion, 
+         m.fecha_analisis, an.nombres, an.apellidos, m.observaciones
+ORDER BY m.fecha_analisis DESC;
+
+-- 9. APICULTORES CON MÁS COLMENAS Y SUS APIARIOS
+SELECT 
+    ap.nombre || ' ' || ap.apellido AS apicultor,
+    COUNT(a.id_apiario) as total_apiarios,
+    SUM(a.cant_colmenas) as total_colmenas,
+    ROUND(AVG(a.cant_colmenas), 1) as promedio_colmenas_por_apiario,
+    STRING_AGG(a.nombre_apiario || ' (' || a.cant_colmenas || ')', ', ') as detalle_apiarios
+FROM apicultor ap
+JOIN apiarios a ON ap.id_apicultor = a.id_apicultor
+GROUP BY ap.id_apicultor, ap.nombre, ap.apellido
+ORDER BY total_colmenas DESC;
+
+-- 10. ANÁLISIS PALINOLÓGICO DETALLADO POR MUESTRA
+SELECT 
+    m.num_registro as muestra,
+    m.fecha_analisis,
+    e.nombre_comun as especie,
+    e.nombre_cientifico,
+    anp.cantidad_granos,
+    anp.porcentaje,
+    anp.marca_especial,
+    CASE 
+        WHEN anp.porcentaje >= 45 THEN 'Dominante'
+        WHEN anp.porcentaje >= 16 THEN 'Secundaria'
+        WHEN anp.porcentaje >= 3 THEN 'Menor importante'
+        ELSE 'Menor'
+    END as clasificacion_polen
+FROM muestra m
+JOIN analisis_palinologico anp ON m.id_muestra = anp.id_muestra
+JOIN especies e ON anp.id_especie = e.id_especie
+WHERE m.fecha_analisis IS NOT NULL
+ORDER BY m.num_registro, anp.porcentaje DESC;
+
+-- 11. TAMBORES Y SU TRAZABILIDAD COMPLETA
+SELECT 
+    t.num_registro as tambor,
+    ap.nombre || ' ' || ap.apellido as apicultor,
+    a.nombre_apiario,
+    a.localidad,
+    ta.fecha_asignacion,
+    CASE 
+        WHEN m.num_registro IS NOT NULL THEN m.num_registro
+        ELSE 'Sin muestra'
+    END as muestra_asociada,
+    CASE 
+        WHEN m.fecha_analisis IS NOT NULL THEN 'Analizada'
+        WHEN m.fecha_analisis IS NULL AND m.id_muestra IS NOT NULL THEN 'Pendiente'
+        ELSE 'Sin análisis'
+    END as estado_analisis
+FROM tambor t
+JOIN tambor_api ta ON t.id_tambor = ta.id_tambor
+JOIN apiarios a ON ta.id_apiario = a.id_apiario
+JOIN apicultor ap ON a.id_apicultor = ap.id_apicultor
+LEFT JOIN muestra_tambor mt ON t.id_tambor = mt.id_tambor
+LEFT JOIN muestra m ON mt.id_muestra = m.id_muestra
+ORDER BY t.num_registro;
+
+-- 12. RENDIMIENTO DE ANALISTAS (PRODUCTIVIDAD)
+SELECT 
+    an.nombres || ' ' || an.apellidos as analista,
+    an.contacto,
+    COUNT(m.id_muestra) as total_muestras_asignadas,
+    COUNT(m.fecha_analisis) as muestras_analizadas,
+    COUNT(m.id_muestra) - COUNT(m.fecha_analisis) as muestras_pendientes,
+    CASE 
+        WHEN COUNT(m.id_muestra) > 0 THEN 
+            ROUND((COUNT(m.fecha_analisis) * 100.0 / COUNT(m.id_muestra)), 1)
+        ELSE 0
+    END as porcentaje_completado,
+    ROUND(AVG(m.fecha_analisis - m.fecha_extraccion), 1) as dias_promedio_analisis
+FROM analista an
+LEFT JOIN muestra m ON an.id_analista = m.id_analista
+GROUP BY an.id_analista, an.nombres, an.apellidos, an.contacto
+ORDER BY porcentaje_completado DESC, total_muestras_asignadas DESC;
+
+-- 13. MIELES MONOFLORALES VS MULTIFLORALES
+WITH clasificacion_miel AS (
+    SELECT 
+        m.id_muestra,
+        m.num_registro,
+        MAX(anp.porcentaje) as max_porcentaje,
+        COUNT(anp.id_palinologico) as num_especies,
+        CASE 
+            WHEN MAX(anp.porcentaje) >= 45 THEN 'Monofloral'
+            ELSE 'Multifloral'
+        END as tipo_miel
+    FROM muestra m
+    JOIN analisis_palinologico anp ON m.id_muestra = anp.id_muestra
+    GROUP BY m.id_muestra, m.num_registro
+)
+SELECT 
+    cm.tipo_miel,
+    COUNT(*) as cantidad_muestras,
+    ROUND(AVG(cm.max_porcentaje), 1) as porcentaje_promedio_dominante,
+    ROUND(AVG(cm.num_especies), 1) as especies_promedio,
+    ROUND((COUNT(*) * 100.0 / (SELECT COUNT(*) FROM clasificacion_miel)), 1) as porcentaje_del_total
+FROM clasificacion_miel cm
+GROUP BY cm.tipo_miel
+ORDER BY cantidad_muestras DESC;
+
+-- 14. LOCALIDADES CON MAYOR PRODUCCIÓN Y DIVERSIDAD
+SELECT 
+    a.localidad,
+    COUNT(DISTINCT a.id_apiario) as num_apiarios,
+    COUNT(DISTINCT ap.id_apicultor) as num_apicultores,
+    SUM(a.cant_colmenas) as total_colmenas,
+    COUNT(DISTINCT t.id_tambor) as tambores_asociados,
+    COUNT(DISTINCT m.id_muestra) as muestras_analizadas,
+    COUNT(DISTINCT e.id_especie) as especies_identificadas
+FROM apiarios a
+JOIN apicultor ap ON a.id_apicultor = ap.id_apicultor
+LEFT JOIN tambor_api ta ON a.id_apiario = ta.id_apiario
+LEFT JOIN tambor t ON ta.id_tambor = t.id_tambor
+LEFT JOIN muestra_tambor mt ON t.id_tambor = mt.id_tambor
+LEFT JOIN muestra m ON mt.id_muestra = m.id_muestra AND m.fecha_analisis IS NOT NULL
+LEFT JOIN analisis_palinologico anp ON m.id_muestra = anp.id_muestra
+LEFT JOIN especies e ON anp.id_especie = e.id_especie
+GROUP BY a.localidad
+ORDER BY total_colmenas DESC, especies_identificadas DESC;
+
+-- 15. ESPECIES EXCLUSIVAS O RARAS (APARECEN EN POCAS MUESTRAS)
+SELECT 
+    e.nombre_comun,
+    e.nombre_cientifico,
+    e.familia,
+    COUNT(DISTINCT anp.id_muestra) as muestras_presentes,
+    ROUND(AVG(anp.porcentaje), 2) as porcentaje_promedio,
+    STRING_AGG(DISTINCT m.num_registro, ', ') as muestras_encontradas,
+    CASE 
+        WHEN COUNT(DISTINCT anp.id_muestra) = 1 THEN 'Exclusiva'
+        WHEN COUNT(DISTINCT anp.id_muestra) <= 2 THEN 'Muy rara'
+        WHEN COUNT(DISTINCT anp.id_muestra) <= 3 THEN 'Rara'
+        ELSE 'Común'
+    END as clasificacion_rareza
+FROM especies e
+LEFT JOIN analisis_palinologico anp ON e.id_especie = anp.id_especie
+LEFT JOIN muestra m ON anp.id_muestra = m.id_muestra
+WHERE anp.id_especie IS NOT NULL
+GROUP BY e.id_especie, e.nombre_comun, e.nombre_cientifico, e.familia
+HAVING COUNT(DISTINCT anp.id_muestra) <= 3
+ORDER BY muestras_presentes ASC, porcentaje_promedio DESC;
