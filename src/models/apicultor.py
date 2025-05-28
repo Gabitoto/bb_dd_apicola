@@ -38,3 +38,6 @@ class Apicultor:
         query = "SELECT * FROM apicultor WHERE id_apicultor = %s"
         resultados = self.db.ejecutar_consulta(query, (id_apicultor,))
         return resultados[0] if resultados else None 
+    
+    def cantidad_de_apiarios(self, id_apicultor: int) -> Optional[Dict]:
+        "Funcion para ver la cantidad de apiarios que poseen cada apicultor"

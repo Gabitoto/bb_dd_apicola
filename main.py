@@ -8,30 +8,30 @@ from src.utils.logger import logger
 from config.config import DB_CONFIG
 
 def main():
-    """Función principal para probar la conexión y operaciones básicas"""
+    """Función principal de interfaz de la BBDD"""
     
     # Crear instancia de la conexión
     db = DatabaseConnection(**DB_CONFIG)
     
     try:
-        # Conectar a la base de datos
+        ## Conectar a la base de datos
         if not db.conectar():
             logger.error("No se pudo conectar a la base de datos")
             return
         
-        # Crear instancia del modelo Apicultor
+        ## Crear instancia del modelo Apicultor
         apicultor_model = Apicultor(db)
         
-        # Probar algunas operaciones
+        ## Probar algunas operaciones
         logger.info("=== PROBANDO OPERACIONES BÁSICAS ===")
         
-        # 1. Obtener todos los apicultores
+        ## Obtener todos los apicultores
         logger.info("1. Listando apicultores:")
         apicultores = apicultor_model.obtener_todos()
         for apicultor in apicultores:
             print(f"  - {apicultor['nombre']} {apicultor['apellido']}")
         
-        # 2. Insertar un nuevo apicultor (ejemplo)
+        ## Insertar un nuevo apicultor (ejemplo)
         logger.info("2. Insertando nuevo apicultor:")
         nuevo_id = apicultor_model.insertar("Ejemplo", "Prueba")
         if nuevo_id:
@@ -43,7 +43,7 @@ def main():
         logger.error(f"Error en la ejecución principal: {e}")
     
     finally:
-        # Cerrar conexión
+        ## Cerrar conexión
         db.desconectar()
 
 if __name__ == "__main__":
