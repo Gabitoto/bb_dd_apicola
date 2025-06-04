@@ -14,34 +14,43 @@ def mostrar_dashboards(db):
     # Gráfico de barras: Cantidad de colmenas por apicultor
     try:
         query_colmenas = """
-        SELECT a.nombre, a.apellido, COUNT(c.id) as total_colmenas
-        FROM apicultores a
-        LEFT JOIN colmenas c ON a.id = c.apicultor_id
-        GROUP BY a.id, a.nombre, a.apellido
+        SELECT 
+            a.nombre || ' ' || a.apellido as nombre_completo,
+            SUM(ap.cant_colmenas) as total_colmenas
+        FROM apicultor a
+        LEFT JOIN apiarios ap ON a.id_apicultor = ap.id_apicultor
+        GROUP BY a.id_apicultor, a.nombre, a.apellido
         ORDER BY total_colmenas DESC
         """
         datos_colmenas = db.ejecutar_consulta(query_colmenas)
         df_colmenas = pd.DataFrame(datos_colmenas)
         
         plt.figure(figsize=(12, 6))
-        sns.barplot(data=df_colmenas, x='nombre', y='total_colmenas')
+        sns.barplot(data=df_colmenas, x='nombre_completo', y='total_colmenas')
         plt.title('Cantidad de Colmenas por Apicultor')
         plt.xticks(rotation=45)
+        plt.xlabel('Apicultor')
+        plt.ylabel('Total de Colmenas')
         plt.tight_layout()
         plt.show()
         
-        # Histograma: Proporción de especies en las muestras
+        # Gráfico circular: Proporción de especies en las muestras
         query_especies = """
-        SELECT especie, COUNT(*) as cantidad
-        FROM muestras
-        GROUP BY especie
+        SELECT 
+            e.nombre_comun,
+            SUM(ap.cantidad_granos) as cantidad
+        FROM analisis_palinologico ap
+        JOIN especies e ON ap.id_especie = e.id_especie
+        GROUP BY e.nombre_comun
+        ORDER BY cantidad DESC
+        LIMIT 10
         """
         datos_especies = db.ejecutar_consulta(query_especies)
         df_especies = pd.DataFrame(datos_especies)
         
         plt.figure(figsize=(10, 6))
-        plt.pie(df_especies['cantidad'], labels=df_especies['especie'], autopct='%1.1f%%')
-        plt.title('Proporción de Especies en las Muestras')
+        plt.pie(df_especies['cantidad'], labels=df_especies['nombre_comun'], autopct='%1.1f%%')
+        plt.title('Top 10 Especies más Frecuentes en las Muestras')
         plt.axis('equal')
         plt.show()
         

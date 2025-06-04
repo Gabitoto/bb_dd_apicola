@@ -23,3 +23,4 @@ def ejecutar_consulta_personalizada(db):
                 print("La consulta no devolvió resultados")
         except Exception as e:
             logger.error(f"Error en la consulta: {e}") 
+            

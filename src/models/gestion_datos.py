@@ -9,7 +9,7 @@ def agregar_nuevos_datos(db):
     """Permite agregar nuevos datos a la base de datos"""
     print("\n=== AGREGAR NUEVOS DATOS ===")
     print("1. Agregar nuevo apicultor")
-    print("2. Agregar nueva colmena")
+    print("2. Agregar nuevo apiario")
     print("3. Agregar nueva muestra")
     print("4. Volver al menú principal")
     
