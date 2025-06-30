@@ -1,6 +1,6 @@
 # Sistema de Gestión Apícola
 
-Sistema de gestión para apiarios que permite manejar apicultores, apiarios, muestras y análisis palinológicos.
+Sistema de gestión para apiarios que permite manejar apicultores, apiarios, muestras y análisis palinológicos presentado como Trabajo Practico Final de la catedra Bases de Datos.
 
 ## Estructura del Proyecto
 
